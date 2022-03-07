@@ -111,7 +111,7 @@ function plotres(fname::AbstractString,fname_all; dineofrec = [
 
     dineof_batch_m_rec = Vector{Any}(undef,length(dineofrec))
     for l = 1:length(dineofrec)
-        dineof_batch_m_rec[l] = dincae_utils.gread(dineofrec[l],missing)[:,end:-1:1,end-ntest+1:end];
+        dineof_batch_m_rec[l] = DINCAE_utils.gread(dineofrec[l],missing)[:,end:-1:1,end-ntest+1:end];
     end
 
     i = 1
@@ -325,10 +325,10 @@ function recmedian(fnames,fnamemedian)
 end
 
 function loadbatchavg(case,fnames)
-    lon,lat,batch_m_true,batch_m_in,batch_m_rec,batch_sigma_rec,mask = dincae_utils.loadbatch(case,fnames[1])
+    lon,lat,batch_m_true,batch_m_in,batch_m_rec,batch_sigma_rec,mask = DINCAE_utils.loadbatch(case,fnames[1])
 
     for i = 2:length(fnames)
-        lon,lat,batch_m_true_,batch_m_in_,batch_m_rec_,batch_sigma_rec_,mask = dincae_utils.loadbatch(case,fnames[i])
+        lon,lat,batch_m_true_,batch_m_in_,batch_m_rec_,batch_sigma_rec_,mask = DINCAE_utils.loadbatch(case,fnames[i])
 
         batch_m_rec += batch_m_rec_
         batch_sigma_rec += batch_sigma_rec_
@@ -344,7 +344,7 @@ errstat(fname::AbstractString) = errstat(stdout,fname)
 
 
 function summary(case,fname)
-    fnamesummary = replace(fname,".nc" => ".json")
+    fnamesummary = replace(fname,".nc" => "-extended.json")
     if isfile(fnamesummary)
     #if false
         summary = JSON.parse(read(fnamesummary,String))
@@ -360,6 +360,11 @@ function summary(case,fname)
         rms = sqrt(mean((m_true - m_rec).^2))
         bias = mean(m_true - m_rec)
 
+        diff = abs.(m_true-m_rec);
+        min_diff = minimum(diff)
+        max_diff = maximum(diff)
+        q10_diff,q90_diff = quantile(diff,(0.1,0.9))
+
         summary = Dict(
             "cvrms" => rms,
             "cvbias" => bias,
@@ -367,7 +372,11 @@ function summary(case,fname)
             "std_rec" => std(m_rec),
             "cor" => cor(m_true,m_rec),
             "cvcrms" => crms(m_true,m_rec),
-            "number" => sum(mm)
+            "number" => sum(mm),
+            "min_diff" => min_diff,
+            "max_diff" => max_diff,
+            "q10_diff" => q10_diff,
+            "q90_diff" => q90_diff,
         )
 
         for i = 1:3
@@ -452,7 +461,7 @@ function summarydineof(dineofrec)
     if !isfile(fnamesummary)
         ntest = 50
 
-        batch_m_rec = dincae_utils.gread(dineofrec,missing)[:,end:-1:1,end-ntest+1:end];
+        batch_m_rec = DINCAE_utils.gread(dineofrec,missing)[:,end:-1:1,end-ntest+1:end];
         ds = Dataset(case.fname_orig)
         batch_m_true = ds[case.varname][:,:,end-ntest+1:end];
         mask = ds["mask"][:];
@@ -491,7 +500,7 @@ function rmsdineof(dineofrec)
     case = AVHRR_case
     ntest = 50
 
-    batch_m_rec = dincae_utils.gread(dineofrec,missing)[:,end:-1:1,end-ntest+1:end];
+    batch_m_rec = DINCAE_utils.gread(dineofrec,missing)[:,end:-1:1,end-ntest+1:end];
     ds = Dataset(case.fname_orig)
     batch_m_true = ds[case.varname][:,:,end-ntest+1:end];
     mask = ds["mask"][:];
@@ -512,17 +521,17 @@ end
 
 function RMS_iteration(case; fnameavg = nothing, yl = case.ylim_rms)
     clf();
-    RMScv = [dincae_utils.cvrms(case,fn) for fn in sort(glob("data*T*.nc"))]
+    RMScv = [DINCAE_utils.cvrms(case,fn) for fn in sort(glob("data*T*.nc"))]
     plot(10*(1:length(RMScv)),RMScv,label="DINCAE");
     xr = xlim()
 
     if haskey(case,:dineofrec)
-        RMSdineof = dincae_utils.rmsdineof(case.dineofrec)
+        RMSdineof = DINCAE_utils.rmsdineof(case.dineofrec)
         hlines(RMSdineof,xr[1],xr[2],linestyle="--",colors="c",label="DINEOF");
     end
 
     if fnameavg != nothing
-        RMScvavg = dincae_utils.cvrms(case,fnameavg)
+        RMScvavg = DINCAE_utils.cvrms(case,fnameavg)
         hlines(RMScvavg,xr[1],xr[2],linestyle="--",colors="r",label="DINCAE avg. rec.");
     end
 
@@ -541,7 +550,7 @@ function compareall(; dineofrec = expanduser("~/Data/Med/AVHRR/Data/sst_all_clou
     fnamemedian = "data-median.nc"
     dineofrec_ = expanduser("~/Data/Med/AVHRR/Data/sst_all_cloudsadded_2008_2009.rec")
     #fnameavg = "data-median.nc"
-    dincae_utils.compare([
+    DINCAE_utils.compare([
         "DINEOF",
         "DINEOF (2008-2009)",
         "DINCAE (no skip connections)",
@@ -574,18 +583,18 @@ function compare(cases,fnames)
     case = AVHRR_case
 
     fnameavg = fnames[end]
-    SSTc = dincae_utils.loadall(fnameavg);
+    SSTc = DINCAE_utils.loadall(fnameavg);
     dineofrec = expanduser("~/Data/Med/AVHRR/Data/sst_all_cloudsadded.rec")
-    SSTd = reverse(dincae_utils.gread(dineofrec,missing),dims = 2);
+    SSTd = reverse(DINCAE_utils.gread(dineofrec,missing),dims = 2);
     SSTorig = Dataset(case.fname_orig)[case.varname][:];
     SSTadd = Dataset(case.fname_cv)[case.varname][:];
 
 
     function comparecase(name,fnameavg)
         if endswith(fnameavg,".nc")
-            SST = dincae_utils.loadall(fnameavg);
+            SST = DINCAE_utils.loadall(fnameavg);
         else
-            SST = reverse(dincae_utils.gread(fnameavg,missing),dims = 2);
+            SST = reverse(DINCAE_utils.gread(fnameavg,missing),dims = 2);
         end
 
         n = (size(SSTorig,3) - size(SST,3)+1) :size(SSTorig,3)
@@ -638,7 +647,7 @@ end
 
 function taylorplot(fname; dineofrec = expanduser("~/Data/Med/AVHRR/Data/sst_all_cloudsadded.rec"))
 
-    d = dincae_utils.summarydineof(dineofrec)
+    d = DINCAE_utils.summarydineof(dineofrec)
     dc = summary(fname)
     ForecastVerification.taylorplot(
         [d["cvcrms"],dc["cvcrms"]],
@@ -651,7 +660,7 @@ end
 
 function plotregion()
     figure(figsize=(6,5))
-    ds = Dataset(dincae_utils.fname_orig);
+    ds = Dataset(DINCAE_utils.fname_orig);
     lon = ds["lon"][:];
     lat = ds["lat"][:];
     close(ds)
@@ -709,7 +718,7 @@ end
 
 function remove_seasonal_cycle(SST,SSTtime; DT = 30)
     doy = Dates.dayofyear.(SSTtime);
-    mSST2 = dincae_utils.seasonalaverage(SST,SSTtime; DT = DT);
+    mSST2 = DINCAE_utils.seasonalaverage(SST,SSTtime; DT = DT);
 
     SSTa = similar(SST);
     for n = 1:size(SST,3)
@@ -720,7 +729,7 @@ end
 
 function std_around_seasonalaverage(SST,SSTtime)
     doy = Dates.dayofyear.(SSTtime);
-    mSST2 = dincae_utils.seasonalaverage(SST,SSTtime);
+    mSST2 = DINCAE_utils.seasonalaverage(SST,SSTtime);
 
     SSTa = similar(SST);
     for n = 1:size(SST,3)
@@ -753,8 +762,8 @@ function compare_std_around_seasonalaverage(;
                                             )
 
     case = AVHRR_case
-    SSTdineof = reverse(dincae_utils.gread(dineofrec,missing),dims = 2)
-    SSTdincae = dincae_utils.loadall(fnameavg);
+    SSTdineof = reverse(DINCAE_utils.gread(dineofrec,missing),dims = 2)
+    SSTdincae = DINCAE_utils.loadall(fnameavg);
 
     ds = Dataset(fname_orig)
     SSTorig = ds[case.varname][:,:,:];
@@ -764,20 +773,20 @@ function compare_std_around_seasonalaverage(;
     close(ds)
 
     figure(figsize=(10,6))
-    SSTdineof_std = @time dincae_utils.std_around_seasonalaverage(SSTdineof,SSTtime);
-    SSTdincae_std = @time dincae_utils.std_around_seasonalaverage(SSTdincae,SSTtime);
-    SSTorig_std = @time dincae_utils.std_around_seasonalaverage(SSTorig,SSTtime);
+    SSTdineof_std = @time DINCAE_utils.std_around_seasonalaverage(SSTdineof,SSTtime);
+    SSTdincae_std = @time DINCAE_utils.std_around_seasonalaverage(SSTdincae,SSTtime);
+    SSTorig_std = @time DINCAE_utils.std_around_seasonalaverage(SSTorig,SSTtime);
 
     subplot(1,3,1)
-    dincae_utils.plot_std_around_seasonalaverage(lon,lat,SSTorig_std)
+    DINCAE_utils.plot_std_around_seasonalaverage(lon,lat,SSTorig_std)
     title("original $(case.varname) std. dev.")
 
     subplot(1,3,2)
-    dincae_utils.plot_std_around_seasonalaverage(lon,lat,SSTdincae_std)
+    DINCAE_utils.plot_std_around_seasonalaverage(lon,lat,SSTdincae_std)
     title("DINCAE $(case.varname) std. dev.")
 
     subplot(1,3,3)
-    ima = dincae_utils.plot_std_around_seasonalaverage(lon,lat,SSTdineof_std)
+    ima = DINCAE_utils.plot_std_around_seasonalaverage(lon,lat,SSTdineof_std)
     title("DINEOF $(case.varname) std. dev.")
 
     subplots_adjust(bottom = 0.1);
@@ -791,9 +800,9 @@ end
 function post_process()
     fnames = sort(glob("*T*.nc"))[20:100]
     fnameavg = "data-avg.nc"
-    #dincae_utils.recavg(fnames,fnameavg)
-    dincae_utils.errstat(fnameavg)
-    dincae_utils.plotres(fnameavg)
+    #DINCAE_utils.recavg(fnames,fnameavg)
+    DINCAE_utils.errstat(fnameavg)
+    DINCAE_utils.plotres(fnameavg)
     compare_std_around_seasonalaverage();
 end
 
@@ -825,7 +834,7 @@ function watch_post_process(case; path = path)
         fname,status = FileWatching.watch_folder(path)
         # make sure file is saved
         sleep(20)
-        @show dincae_utils.cvrms.(Ref(case),sort(glob("*T*.nc")));
+        @show DINCAE_utils.cvrms.(Ref(case),sort(glob("*T*.nc")));
         @show Dates.now()
     end
 end
@@ -939,8 +948,8 @@ function prep_sst()
 end
 
 function prep_chlor_a_log()
-    case = dincae_utils.cases("chlor_a")
-    case2 = dincae_utils.cases("chlor_a_log")
+    case = DINCAE_utils.cases("chlor_a")
+    case2 = DINCAE_utils.cases("chlor_a_log")
     cp(case.fname_orig,case2.fname_orig)
     cp(case.fname_cv,case2.fname_cv)
 
@@ -981,7 +990,7 @@ function splitdata(fname,split = [("train",0.7),("dev",0.2),("test",0.1)])
         newfname = replace(fname,".nc" => "." * name * ".nc")
         push!(newfnames,newfname)
         println("$name: indices: $range; fraction: $(length(range)/totlength), $newfname ")
-        dincae_utils.ncsplit(fname,newfname,time = range)
+        DINCAE_utils.ncsplit(fname,newfname,time = range)
     end
 
     return newfnames
@@ -1001,7 +1010,7 @@ function prep_mv2()
     for d in data
         add_mask(d.filename,d.varname)
 
-        newfnames = dincae_utils.splitdata(d.filename,split)
+        newfnames = DINCAE_utils.splitdata(d.filename,split)
 
         addcvpoint(newfnames[2],d.varname, mincvfrac = mincvfrac)
         addcvpoint(newfnames[3],d.varname, mincvfrac = mincvfrac)
@@ -1159,7 +1168,9 @@ function listcvimages(case)
     return image_index
 end
 
-function plotres(case, fname_rec; transfun = (identity,identity), clim = case.clim, which_plot = :all, cb_orientation = "vertical",cmap="viridis")
+function plotres(case, fname_rec; transfun = (identity,identity), clim = case.clim, which_plot = :all, cb_orientation = "vertical",cmap="viridis",
+                 figdir = "Fig"
+                 )
 
     function myplot(x, t, cl = extrema(skipmissing(x)); kwargs...)
         subplots_adjust(hspace = 0.35)
@@ -1176,6 +1187,7 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
         ylim(extrema(lat))
     end
 
+    mkpath(figdir)
     fname_orig = case.fname_orig
     fname_cv = case.fname_cv
     varname = case.varname
@@ -1246,10 +1258,8 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
         #myplot(ds_rec["batch_sigma_rec"][:,:,n],"σ")
         myplot(ds_rec[varname * "_error"][:,:,n],"(d) Exp. error std. dev.")
 
-        figdir = "Fig"
-        mkpath(figdir)
         figname = joinpath(figdir,replace(basename(fname_rec),".nc" => "_" * Dates.format(time[n],"yyyy-mm-dd") * ".png"))
-        @show figname
+        @debug figname
         savefig(figname,dpi=300)
     end
 
@@ -1345,9 +1355,9 @@ function testlags()
 end
 
 function testlags(windtype)
-    sst_case = dincae_utils.cases("sst_t")
-    uwnd_case = dincae_utils.cases("uwnd")
-    vwnd_case = dincae_utils.cases("vwnd")
+    sst_case = DINCAE_utils.cases("sst_t")
+    uwnd_case = DINCAE_utils.cases("uwnd")
+    vwnd_case = DINCAE_utils.cases("vwnd")
 
     uwnd =
         Dataset(uwnd_case.fname_orig) do ds
@@ -1368,9 +1378,9 @@ function testlags(windtype)
     #wnd = abs.(uwnd + 1im * vwnd)
     #wnd = fun.(uwnd,vwnd)
     DT = 3
-    ssta = dincae_utils.remove_seasonal_cycle(sst,datatime; DT = DT)
-    #uwnda = dincae_utils.remove_seasonal_cycle(uwnd,datatime; DT = DT)
-    #vwnda = dincae_utils.remove_seasonal_cycle(vwnd,datatime; DT = DT)
+    ssta = DINCAE_utils.remove_seasonal_cycle(sst,datatime; DT = DT)
+    #uwnda = DINCAE_utils.remove_seasonal_cycle(uwnd,datatime; DT = DT)
+    #vwnda = DINCAE_utils.remove_seasonal_cycle(vwnd,datatime; DT = DT)
 
     #wnda = cat(uwnda,vwnda,dims=Val(4))
     speed = sqrt.(uwnd.^2 + vwnd.^2)
@@ -1407,7 +1417,7 @@ function testlags(windtype)
     σ_time = sqrt.(smoothing_jmax/2)
     @show σ_time
 
-    CC = dincae_utils.testlagssmooth(ssta,wnd,lags,smoothing_jmax)
+    CC = DINCAE_utils.testlagssmooth(ssta,wnd,lags,smoothing_jmax)
 
     #plot(lags,CC); ylabel("correlation coefficient"); xlabel("time shift in days")
     #pcolor(lags,smoothing_jmax,CC'); ylabel("correlation coefficient"); xlabel("time shift in days")
@@ -1419,9 +1429,9 @@ end
 
 
 function prep_wind_speed()
-    #JLD2.@load "dincae_utils.testlags_speed123.jld2"
+    #JLD2.@load "DINCAE_utils.testlags_speed123.jld2"
     res =
-        JLD2.jldopen("dincae_utils.testlags_speed123.jld2") do file
+        JLD2.jldopen("DINCAE_utils.testlags_speed123.jld2") do file
             file["res"]
         end
 
@@ -1435,8 +1445,8 @@ function prep_wind_speed()
     i,j = Tuple(findmax(CC)[2])
 
     @show findmax(CC)[1],size(CC),length(σ_time),lags[i],σ_time[j]
-    uwnd_case = dincae_utils.cases("uwnd")
-    vwnd_case = dincae_utils.cases("vwnd")
+    uwnd_case = DINCAE_utils.cases("uwnd")
+    vwnd_case = DINCAE_utils.cases("vwnd")
 
     uwnd,vwnd,lon,lat,datatime =
         Dataset(uwnd_case.fname_orig) do ds
@@ -1590,5 +1600,76 @@ function plotstat(
     ylim(extrema(lat))
     set_aspect_ratio()
     close(ds)
+end
+
+
+
+function errstat_time(case,fname_rec)
+    fname_orig = case.fname_orig
+    fname_cv = case.fname_cv
+    varname = case.varname
+
+    ds_rec = NCDataset(fname_rec,"r")
+    ds_cv = Dataset(fname_cv);
+    ds_orig = Dataset(fname_orig);
+
+    time = ds_orig["time"][:]
+    lon = ds_orig["lon"][:]
+    lat = ds_orig["lat"][:]
+    mask = ds_cv["mask"][:,:] .== 1
+
+
+    rms_cv = fill(NaN,length(time))
+    rms_noncv = fill(NaN,length(time))
+    bias_cv = fill(NaN,length(time))
+    q10 = fill(NaN,length(time))
+    q90 = fill(NaN,length(time))
+    min_err = fill(NaN,length(time))
+    max_err = fill(NaN,length(time))
+    min_abs_err = fill(NaN,length(time))
+    max_abs_err = fill(NaN,length(time))
+    max_abs_err_lon = fill(NaN,length(time))
+    max_abs_err_lat = fill(NaN,length(time))
+
+    rr(x) = replace(x, NaN => missing)
+    n = 80
+    for n = 1:length(time)
+        data_cv = ds_cv[varname][:,:,n]
+        data_orig = ds_orig[varname][:,:,n]
+        data_rec = ds_rec[varname][:,:,n]
+        data_orig[.!mask] .= missing
+
+        difference = data_rec - data_orig
+        mask_cv = ismissing.(data_cv) .&  .!ismissing.(data_orig)
+        mask_noncv = .!ismissing.(data_cv) .&  .!ismissing.(data_orig)
+        sum(mask_cv)
+        diff_cv = Float64.(difference[mask_cv])
+        diff_noncv = Float64.(difference[mask_noncv])
+
+        if length(diff_cv) > 0
+            bias_cv[n] = mean(diff_cv)
+            rms_cv[n] = sqrt(mean(diff_cv.^2))
+            rms_noncv[n] = sqrt(mean(diff_noncv.^2))
+
+            q10[n],q90[n] = quantile(abs.(diff_cv),(0.1,0.9))
+            min_err[n] = minimum(diff_cv)
+            max_err[n] = maximum(diff_cv)
+
+            min_abs_err[n] = minimum(abs.(diff_cv))
+            max_abs_err[n] = maximum(abs.(diff_cv))
+
+            idx = findmax(coalesce.(abs.(difference),-Inf))[2]
+            max_abs_err_lon[n] = lon[idx[1]]
+            max_abs_err_lat[n] = lat[idx[2]]
+        end
+    end
+
+    close(ds_orig)
+    close(ds_cv)
+    close(ds_rec)
+
+    errstat = (; rms_cv, bias_cv, q10, q90, min_err, max_err, min_abs_err, max_abs_err, max_abs_err_lon, max_abs_err_lat, rms_noncv)
+
+    return (time,errstat)
 end
 end # module
