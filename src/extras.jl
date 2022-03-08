@@ -4,8 +4,6 @@ using ForecastVerification
 using JLD2
 using LaTeXTabulars
 using OceanPlot
-using PyCall
-using PyCall: PyObject
 
 include("linreg.jl")
 

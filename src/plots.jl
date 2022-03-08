@@ -1,4 +1,11 @@
 
+
+function PyObject(a::Array{Union{Missing},N}) where {N}
+  numpy_ma = pyimport("numpy").ma
+  pycall(numpy_ma.array, Any, coalesce.(a,1.), mask=ismissing.(a))
+end
+
+
 """
 Fixes the aspect ratio of a plot.
 """
@@ -8,21 +15,34 @@ function set_aspect_ratio()
     ax.set_aspect(1/as)
 end
 
-function plotmap(; patchcolor = [.8,.8,.8], resolution='i', grid=5)
-    xl = xlim()
-    yl = ylim()
+function plotmap(; patchcolor = [.8,.8,.8], resolution='f', grid=5)
     lon,lat,data = GeoDatasets.landseamask(resolution=resolution,grid=grid)
-    contourf(lon,lat,data',levels = [0.5,2],colors = [patchcolor]);
-    xlim(xl)
-    ylim(yl)
+
+#    function plot()
+        xl = xlim()
+        yl = ylim()
+        #    @show size(data)
+        contourf(lon,lat,data',levels = [0.5,2],colors = [patchcolor]);
+        xlim(xl)
+        ylim(yl)
+#    end
+#    return plot
 end
 
 function plotres(case, fname_rec; transfun = (identity,identity), clim = case.clim, which_plot = :all, cb_orientation = "vertical",cmap="viridis",
+                 clim_quantile = (0.,1.),
                  figdir = "Fig"
                  )
 
     function myplot(x, t, cl = extrema(skipmissing(x)); kwargs...)
         subplots_adjust(hspace = 0.35)
+        #@show size(x), typeof(x), typeof(lon), typeof(lat)
+
+        if all(ismissing,x)
+            x = fill(NaN,size(x))
+        else
+            x = nomissing(x,NaN);
+        end
         pcolor(lon,lat,x'; cmap=cmap, kwargs...)
         set_aspect_ratio()
         title(t)
@@ -35,6 +55,8 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
         xlim(extrema(lon))
         ylim(extrema(lat))
     end
+
+    #_plotmap = plotmap()
 
     mkpath(figdir)
     fname_orig = case.fname_orig
@@ -63,8 +85,10 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
     fig = figure(figsize=(10,7))
 
     for n = time_index
+    #for n = time_index[1:1]
     #for n = 1:1
         clf()
+        println("plot ",time[n])
 
         data_cv = ds_cv[varname][:,:,n]
         data_orig = ds_orig[varname][:,:,n]
@@ -76,12 +100,17 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
 
         cl =
             if (clim == nothing)
-                extrema(skipmissing(vcat(fn.(data_orig[:]),fn.(data_rec[:]))))
+                tmp = skipmissing(vcat(fn.(data_orig[mask]),fn.(data_rec[mask])))
+                #extrema(tmp)
+                quantile(tmp,clim_quantile)
             else
                 clim
             end
 
-        #@show cl,time[n]
+        @debug begin
+            @show cl,time[n]
+        end
+
         if transfun[1] == log
             norm = matplotlib.colors.LogNorm(vmin=cl[1], vmax=cl[1])
         else
@@ -115,4 +144,6 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
     close(ds_cv)
     close(ds_orig)
     close(ds_rec)
+
+    return nothing
 end
