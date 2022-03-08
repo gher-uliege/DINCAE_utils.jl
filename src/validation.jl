@@ -1,4 +1,76 @@
 
+"""
+    rms(x,y)
+
+Root mean square difference between `x` and `y`
+"""
+rms(x,y) = sqrt(mean((x - y).^2))
+
+
+"""
+    crms(x,y)
+
+Centred root mean square difference between `x` and `y`
+"""
+crms(x,y) = rms(x .- mean(x),y .- mean(y))
+
+bias(x,y) = mean(x) - mean(y)
+
+
+function loadbatch(case,fname)
+    ds = Dataset(fname);
+    lon = ds["lon"][:]
+    lat = ds["lat"][:]
+
+    # all data
+    ntest = ds.dim["time"]
+
+    if haskey(case,:ntest)
+        if get(case,:ntest,"") == "last-50"
+            ntest = 50
+        end
+    end
+
+    @show ntest
+
+    mean_varname = case.varname
+    sigma_varname = case.varname * "_error"
+
+    batch_m_rec = ds[mean_varname][:,:,end-ntest+1:end]
+
+    batch_sigma_rec =
+        if sigma_varname != nothing
+            ds[sigma_varname][:,:,end-ntest+1:end]
+        else
+            @warn "no error estimate found"
+            zeros(size(batch_m_rec))
+        end
+
+
+    # add mean
+    if haskey(ds,"batch_m_rec")
+        # old files
+        meandata = ds["meandata"][:]
+        batch_m_rec = batch_m_rec .+ meandata
+    end
+
+    close(ds)
+
+    ntest = size(batch_m_rec,3)
+
+    ds = Dataset(case.fname_cv);
+    batch_m_in = ds[case.varname][:,:,end-ntest+1:end]
+    mask = ds["mask"][:];
+    close(ds)
+
+    ds = Dataset(case.fname_orig);
+    batch_m_true = ds[case.varname][:,:,end-ntest+1:end]
+    close(ds)
+
+    return lon,lat,batch_m_true,batch_m_in,batch_m_rec,batch_sigma_rec,mask
+end
+
+
 function summary(case,fname)
     fnamesummary = replace(fname,".nc" => "-extended.json")
     if isfile(fnamesummary)

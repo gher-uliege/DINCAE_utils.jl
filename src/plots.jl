@@ -43,7 +43,7 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
         else
             x = nomissing(x,NaN);
         end
-        pcolor(lon,lat,x'; cmap=cmap, kwargs...)
+        pcolor(lon,lat,x'; cmap=cmap, shading = "nearest", kwargs...)
         set_aspect_ratio()
         title(t)
 
@@ -58,6 +58,7 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
 
     #_plotmap = plotmap()
 
+    PyPlot.ioff()
     mkpath(figdir)
     fname_orig = case.fname_orig
     fname_cv = case.fname_cv
