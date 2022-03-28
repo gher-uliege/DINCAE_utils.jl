@@ -43,8 +43,13 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
         else
             x = nomissing(x,NaN);
         end
-        #pcolor(lon,lat,x'; cmap=cmap, shading = "nearest", kwargs...)
-        pcolor(lon,lat,x'; cmap=cmap, kwargs...)
+
+        if VersionNumber(PyPlot.matplotlib.__version__) <  v"3.3"
+            pcolor(lon,lat,x'; cmap=cmap, kwargs...)
+        else
+            pcolor(lon,lat,x'; cmap=cmap, shading = "nearest", kwargs...)
+        end
+
         set_aspect_ratio()
         title(t)
 
