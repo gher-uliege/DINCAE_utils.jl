@@ -141,6 +141,10 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
         figname = joinpath(figdir,replace(basename(fname_rec),".nc" => "_" * Dates.format(time[n],"yyyy-mm-dd") * ".png"))
         @debug figname
         savefig(figname,dpi=300)
+
+        GC.gc()
+        pyGC = pyimport("gc")
+        pyGC.collect()
     end
 
     close(ds_cv)
