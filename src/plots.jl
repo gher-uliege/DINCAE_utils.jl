@@ -43,7 +43,8 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
         else
             x = nomissing(x,NaN);
         end
-        pcolor(lon,lat,x'; cmap=cmap, shading = "nearest", kwargs...)
+        #pcolor(lon,lat,x'; cmap=cmap, shading = "nearest", kwargs...)
+        pcolor(lon,lat,x'; cmap=cmap, kwargs...)
         set_aspect_ratio()
         title(t)
 
