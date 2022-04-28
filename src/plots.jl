@@ -31,7 +31,9 @@ end
 
 function plotres(case, fname_rec; transfun = (identity,identity), clim = case.clim, which_plot = :all, cb_orientation = "vertical",cmap="viridis",
                  clim_quantile = (0.,1.),
-                 figdir = "Fig"
+                 prefix = "",
+                 figdir = "Fig",
+                 title_time_format = "yyyy-mm-dd",
                  )
 
     function myplot(x, t, cl = extrema(skipmissing(x)); kwargs...)
@@ -118,7 +120,7 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
             norm = matplotlib.colors.Normalize(vmin=cl[1], vmax=cl[1])
         end
 
-        fig.suptitle("Date: $(Dates.format(time[n],"yyyy-mm-dd"))", fontsize=16)
+        fig.suptitle("Date: $(Dates.format(time[n],title_time_format))", fontsize=16)
         hspace = 0.2
         subplot(2,2,1)
         myplot(fn.(data_orig),"(a) Original data",cl,norm=norm)
@@ -137,7 +139,7 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
         #myplot(ds_rec["batch_sigma_rec"][:,:,n],"σ")
         myplot(ds_rec[varname * "_error"][:,:,n],"(d) Exp. error std. dev.")
 
-        figname = joinpath(figdir,replace(basename(fname_rec),".nc" => "_" * Dates.format(time[n],"yyyy-mm-dd") * ".png"))
+        figname = joinpath(figdir,prefix * replace(basename(fname_rec),".nc" => "_" * Dates.format(time[n],"yyyy-mm-ddTHHMM") * ".png"))
         @debug figname
         savefig(figname,dpi=300)
     end
