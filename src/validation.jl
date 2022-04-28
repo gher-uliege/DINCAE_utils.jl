@@ -71,8 +71,9 @@ function loadbatch(case,fname)
 end
 
 
-function summary(case,fname)
-    fnamesummary = replace(fname,".nc" => "-extended.json")
+function summary(case,fname;
+                 fnamesummary = replace(fname,".nc" => "-" * case.varname * ".json")
+)
     if isfile(fnamesummary)
     #if false
         summary = JSON.parse(read(fnamesummary,String))
@@ -118,7 +119,7 @@ function summary(case,fname)
     end
 end
 
-cvrms(case,fname) = Float32(summary(case,fname)["cvrms"])
+cvrms(case,fname; kwargs...) = Float32(summary(case,fname; kwargs...)["cvrms"])
 
 function errstat(io,case,fname::AbstractString; figprefix = replace(fname,".nc" => ""))
     println(io,fname)
