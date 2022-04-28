@@ -45,7 +45,13 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
         else
             x = nomissing(x,NaN);
         end
-        pcolor(lon,lat,x'; cmap=cmap, shading = "nearest", kwargs...)
+
+        if VersionNumber(PyPlot.matplotlib.__version__) <  v"3.3"
+            pcolor(lon,lat,x'; cmap=cmap, kwargs...)
+        else
+            pcolor(lon,lat,x'; cmap=cmap, shading = "nearest", kwargs...)
+        end
+
         set_aspect_ratio()
         title(t)
 
@@ -142,6 +148,10 @@ function plotres(case, fname_rec; transfun = (identity,identity), clim = case.cl
         figname = joinpath(figdir,prefix * replace(basename(fname_rec),".nc" => "_" * Dates.format(time[n],"yyyy-mm-ddTHHMM") * ".png"))
         @debug figname
         savefig(figname,dpi=300)
+
+        GC.gc()
+        pyGC = pyimport("gc")
+        pyGC.collect()
     end
 
     close(ds_cv)
