@@ -2,7 +2,7 @@ module DINCAE_utils
 
 using Dates
 using Distributions
-#using DINCAE
+using DINCAE
 using GeoDatasets
 using GeoMapping
 using Glob
