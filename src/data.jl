@@ -76,11 +76,11 @@ end
     DINCAE_utils.addcvpoint(fname,varname; mincvfrac = 0.10)
 
 Add cross-validation points to a dataset. This functions will withheld data in
-the time slices with the highest data coverage using the data mask from other
-time instances.
-
-Adds a mask based on minimum fraction of sea data in the NetCDF variable
-`varname`.
+the time instance with the highest data coverage (i.e. the cleanest image) 
+using the cloud mask from another time instance (choosen at random). Then 
+the algorithm will proceed the next image with the second highest coverage and so on.
+The algorithm stops when the fraction of cross-validation data point is at minimum 
+`mincvfrac` (per default 0.1 or 10%).
 """
 function addcvpoint(fname,varname; mincvfrac = 0.10)
     fname_cv = replace(fname,r".nc$" => "_add_clouds.nc")
