@@ -136,7 +136,7 @@ function listcvimages(case)
     mask = ds_cv["mask"][:,:] .== 1
 
     image_index = Int[]
-    for n = 1:ds_cv.dim["time"]
+    for n = 1:length(ds_cv["time"])
         data_cv = ds_cv[case.varname][:,:,n]
         data_orig = ds_orig[case.varname][:,:,n]
         data_orig[.!mask] .= missing
