@@ -170,6 +170,7 @@ function plotvec(cases,fnameavg,varnames;
                  maskname = nothing,
                  cl = (-0.7, 0.7),
                  ireduce = 5,
+                 which_plot = :all,
                  )
 
     function plotrad(hfsite,r,cl)
@@ -213,8 +214,19 @@ function plotvec(cases,fnameavg,varnames;
         mask = trues(length(lon),length(lat))
     end
 
+    time_index =
+        if which_plot == :all
+            1:length(time)
+        else
+            sort(unique(reduce(vcat,listcvimages.(cases))))
+        end
+
     #for n = 1:32
-    for n = 1:length(time)
+    #for n = 1:length(time)
+    for n = time_index
+        clf()
+        println("plot ",time[n])
+
         u = ds["u"][:,:,n]
         v = ds["v"][:,:,n]
 

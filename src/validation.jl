@@ -172,7 +172,10 @@ function summary(case,fname;
     else
         lon,lat,batch_m_true,batch_m_in,batch_m_rec,batch_sigma_rec,mask = loadbatch(case,fname)
         @show size(batch_m_true)
-        mm = ismissing.(batch_m_in) .& .!ismissing.(batch_m_true) .& reshape(mask .== 1,(size(mask,1),size(mask,2),1));
+        mm = (ismissing.(batch_m_in) .&
+            .!ismissing.(batch_m_true) .&
+            .!ismissing.(batch_m_rec) .&
+            reshape(mask .== 1,(size(mask,1),size(mask,2),1)));
         #mm = ismissing.(batch_m_in) .& .!ismissing.(batch_m_true)
         m_true = batch_m_true[mm]
         m_rec = batch_m_rec[mm]
