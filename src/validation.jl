@@ -70,12 +70,43 @@ function loadbatch_scalar(case,fname)
     return lon,lat,batch_m_true,batch_m_in,batch_m_rec,batch_sigma_rec,mask
 end
 
+
+"""
+    az = azimuth(lat1,lon1,lat2,lon2)
+
+Compute azimuth, i.e. the angle at (`lat1`,`lon1`) between the point (`lat2`,`lon2`) and the North, counted clockwise starting from the North.
+The units of all input and output parameters are degrees.
+
+```
+          North
+            ↑
+            | .
+            |   . az
+(lat1,lon1) +   .
+             ╲ ↙
+              ╲
+               ╲
+                * (lat2,lon2)
+```
+"""
+function azimuth(lat1,lon1,lat2,lon2)
+    # https://en.wikipedia.org/w/index.php?title=Azimuth&oldid=750059816#Calculating_azimuth
+
+    Δλ = π/180 * (lon2 - lon1)
+    ϕ1 = π/180 * lat1
+    ϕ2 = π/180 * lat2
+
+    α = atan(sin(Δλ), cos(ϕ1)*tan(ϕ2) - sin(ϕ1)*cos(Δλ))
+    return 180/π * α
+end
+
+
 function dirobs(lon,lat,sitelon,sitelat,positive_toward)
     direction_obs =
         if lat isa Vector
-            GeoMapping.azimuth.(lat',lon,sitelat,sitelon)
+            azimuth.(lat',lon,sitelat,sitelon)
         else
-            GeoMapping.azimuth.(lat,lon,sitelat,sitelon)
+            azimuth.(lat,lon,sitelat,sitelon)
         end
 
     # for WERA positve is away from the HF radar site, so add 180 to direction
