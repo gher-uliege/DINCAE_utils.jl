@@ -190,18 +190,22 @@ end
 
 function remove_seasonal_cycle(SST,SSTtime; DT = 30, cycle_len = 365)
     doy = Dates.dayofyear.(SSTtime);
-    mSST2 = DINCAE_utils.seasonalaverage(SST,SSTtime; DT = DT, cycle_len = cycle_len);
+    mSST2 = seasonalaverage(
+        SST,SSTtime;
+        DT = DT, cycle_len = cycle_len);
 
     SSTa = similar(SST);
     for n = 1:size(SST,3)
         SSTa[:,:,n] = SST[:,:,n] - mSST2[:,:,doy[n]]
     end
-    return SSTa
+    return SSTa,mSST2
 end
 
-function std_around_seasonalaverage(SST,SSTtime)
+function std_around_seasonalaverage(SST,SSTtime; DT = 30, cycle_len = 365)
     doy = Dates.dayofyear.(SSTtime);
-    mSST2 = DINCAE_utils.seasonalaverage(SST,SSTtime);
+    mSST2 = seasonalaverage(
+        SST,SSTtime;
+        DT = DT, cycle_len = cycle_len);
 
     SSTa = similar(SST);
     for n = 1:size(SST,3)
