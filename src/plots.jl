@@ -29,7 +29,10 @@ function plotmap(; patchcolor = [.8,.8,.8], resolution='f', grid=5)
 #    return plot
 end
 
-function plotres(case, fname_rec; transfun = (identity,identity), clim = case.clim, which_plot = :all, cb_orientation = "vertical",cmap="viridis",
+function plotres(case, fname_rec; transfun = (identity,identity),
+                 clim = (hasproperty(case,:clim) ? case.clim : nothing),
+                 which_plot = :all, cb_orientation = "vertical",
+                 cmap="viridis",
                  clim_quantile = (0.,1.),
                  prefix = "",
                  figdir = "Fig",
