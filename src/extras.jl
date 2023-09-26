@@ -1,9 +1,12 @@
+using PyPlot
 using DIVAnd
 using FileWatching
 using ForecastVerification
 using JLD2
 using LaTeXTabulars
 using OceanPlot
+using Printf
+using NCDatasets
 
 include("linreg.jl")
 
