@@ -1,3 +1,21 @@
+
+function splitindices(totlength,split = [("train",0.7),("dev",0.2),("test",0.1)])
+    ranges = []
+    i = 0
+
+    for (name,fraction)  in split
+        len = round(Int,totlength * fraction)
+        range =  (i+1) : min(i+len, totlength)
+        i += len
+        push!(ranges,(;range, name))
+        println("$name: indices: $range; fraction: $(length(range)/totlength)")
+    end
+
+    return ranges
+end
+
+
+
 """
     DINCAE_utils.splitdata(fname,split = [("train",0.7),("dev",0.2),("test",0.1)])
 
@@ -8,13 +26,9 @@ function splitdata(fname,split = [("train",0.7),("dev",0.2),("test",0.1)])
     ds = NCDataset(fname,"r")
     totlength = ds.dim["time"] :: Int
 
-    i = 0
     newfnames = String[]
 
-    for (name,fraction)  in split
-        len = round(Int,totlength * fraction)
-        range =  (i+1) : min(i+len, totlength)
-        i += len
+    for (range,name)  in splitindices(totlength,split)
         newfname = replace(fname,".nc" => "." * name * ".nc")
         push!(newfnames,newfname)
         println("$name: indices: $range; fraction: $(length(range)/totlength), $newfname ")
@@ -90,7 +104,13 @@ function addcvpoint(fname,varname; mincvfrac = 0.10)
     Dataset(fname_cv,"a") do ds
         data = ds[varname][:,:,:];
         time = ds["time"][:];
-        mask = ds["mask"][:,:][:,:,1:1] .== 1
+
+        if !haskey(ds,"mask")
+            @info "no mask in $fname"
+            mask = trues(size(data)[1:2]...,1)
+        else
+            mask = ds["mask"][:,:][:,:,1:1] .== 1
+        end
 
         data[.!ismissing.(data) .& .!mask] .= missing
 
@@ -119,7 +139,7 @@ function addcvpoint(fname,varname; mincvfrac = 0.10)
             if ncv >= mincvfrac * nvalid
                 break
             end
-            @show n_dest,time[n_dest],nmissing_after - nmissing_before,ncv,mincvfrac * nvalid
+            #@show n_dest,time[n_dest],nmissing_after - nmissing_before,ncv,mincvfrac * nvalid
         end
 
         @info("number cross-validation points ",ncv)
@@ -175,7 +195,12 @@ function seasonalaverage(SST,time; DT = 30, cycle_len = 365)
                         end
                     end
                 end
-                mSST[i,j,nn] /= count
+
+                if count > 0
+                    mSST[i,j,nn] /= count
+                else
+                    mSST[i,j,nn] = missing
+                end
 
 #                #for i = 1:2
 #                sel .= abs.(  mod.( doy  .- doy[nn] .+ 365/2, 365) .- 365/2) .<= DT÷2;
