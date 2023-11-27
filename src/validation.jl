@@ -50,7 +50,7 @@ function loadbatch(case,fname)
     # add mean
     if haskey(ds,"batch_m_rec")
         # old files
-        meandata = ds["meandata"][:]
+        meandata = ds["meandata"][:,:]
         batch_m_rec = batch_m_rec .+ meandata
     end
 
@@ -60,7 +60,7 @@ function loadbatch(case,fname)
 
     ds = Dataset(case.fname_cv);
     batch_m_in = ds[case.varname][:,:,end-ntest+1:end]
-    mask = ds["mask"][:];
+    mask = ds["mask"][:,:];
     close(ds)
 
     ds = Dataset(case.fname_orig);
