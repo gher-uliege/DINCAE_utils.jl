@@ -96,7 +96,7 @@ the algorithm will proceed the next image with the second highest coverage and s
 The algorithm stops when the fraction of cross-validation data point is at minimum 
 `mincvfrac` (per default 0.1 or 10%).
 """
-function addcvpoint(fname,varname; mincvfrac = 0.10)
+function addcvpoint(fname,varname; mincvfrac = 0.10, min_frac_missing = 0, max_frac_missing = 1)
     fname_cv = replace(fname,r".nc$" => "_add_clouds.nc")
     cp(fname,fname_cv,force=true)
     n_cv = Int[]
@@ -117,12 +117,19 @@ function addcvpoint(fname,varname; mincvfrac = 0.10)
         nvalid = sum(.!ismissing.(data))
 
         ncv = 0
-
+        dest_count = 0
         tmp = data[:,:,1]
         nmissing = sum(ismissing,data,dims=[1,2])[1,1,:]
+        frac_missing = (nmissing .- sum(.!mask)) / (size(data,1)*size(data,2) - sum(.!mask))
+
+        @show extrema(frac_missing)
+        @show frac_missing[1:10]
+
+        candiate_mask_index = findall(min_frac_missing .<= frac_missing .<= max_frac_missing)
+        @show length(candiate_mask_index)
 
         for n_dest in sortperm(nmissing)
-            n_source = rand(1:size(data,3))
+            n_source = rand(candiate_mask_index)
 
             tmp = data[:,:,n_dest]
             nmissing_before = sum(ismissing,tmp)
@@ -136,6 +143,7 @@ function addcvpoint(fname,varname; mincvfrac = 0.10)
 
             ncv += nmissing_after - nmissing_before
 
+            dest_count += 1
             if ncv >= mincvfrac * nvalid
                 break
             end
@@ -144,6 +152,7 @@ function addcvpoint(fname,varname; mincvfrac = 0.10)
 
         @info("number cross-validation points ",ncv)
         @info("percentage of cross-validation points ",100*ncv/nvalid)
+        @info("number corrupted images ",dest_count)
 
         ds[varname][:] = data
     end
