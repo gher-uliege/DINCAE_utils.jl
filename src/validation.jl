@@ -164,8 +164,9 @@ end
 
 function summary(case,fname;
                  fnamesummary = replace(fname,".nc" => "-" * case.varname * ".json"),
+                 cache = true,
 )
-    if isfile(fnamesummary)
+    if isfile(fnamesummary) && cache
     #if false
         summary = JSON.parse(read(fnamesummary,String))
         return summary
