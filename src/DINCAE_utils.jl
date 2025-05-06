@@ -2,6 +2,7 @@ module DINCAE_utils
 
 using Dates
 using Distributions
+using DINCAE
 using GeoDatasets
 using Glob
 using JSON
@@ -13,6 +14,7 @@ using PyCall
 using PyCall: PyObject
 using Random
 using Statistics
+using Interpolations
 
 include("data.jl")
 include("plots.jl")

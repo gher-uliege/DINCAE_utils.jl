@@ -1,3 +1,21 @@
+
+function splitindices(totlength,split = [("train",0.7),("dev",0.2),("test",0.1)])
+    ranges = []
+    i = 0
+
+    for (name,fraction)  in split
+        len = round(Int,totlength * fraction)
+        range =  (i+1) : min(i+len, totlength)
+        i += len
+        push!(ranges,(;range, name))
+        println("$name: indices: $range; fraction: $(length(range)/totlength)")
+    end
+
+    return ranges
+end
+
+
+
 """
     DINCAE_utils.splitdata(fname,split = [("train",0.7),("dev",0.2),("test",0.1)])
 
@@ -8,13 +26,9 @@ function splitdata(fname,split = [("train",0.7),("dev",0.2),("test",0.1)])
     ds = NCDataset(fname,"r")
     totlength = ds.dim["time"] :: Int
 
-    i = 0
     newfnames = String[]
 
-    for (name,fraction)  in split
-        len = round(Int,totlength * fraction)
-        range =  (i+1) : min(i+len, totlength)
-        i += len
+    for (range,name)  in splitindices(totlength,split)
         newfname = replace(fname,".nc" => "." * name * ".nc")
         push!(newfnames,newfname)
         println("$name: indices: $range; fraction: $(length(range)/totlength), $newfname ")
@@ -87,7 +101,7 @@ the algorithm will proceed the next image with the second highest coverage and s
 The algorithm stops when the fraction of cross-validation data point is at minimum
 `mincvfrac` (per default 0.1 or 10%).
 """
-function addcvpoint(fname,varname; mincvfrac = 0.10)
+function addcvpoint(fname,varname; mincvfrac = 0.10, min_frac_missing = 0, max_frac_missing = 1)
     fname_cv = replace(fname,r".nc$" => "_add_clouds.nc")
     cp(fname,fname_cv,force=true)
     n_cv = Int[]
@@ -95,19 +109,32 @@ function addcvpoint(fname,varname; mincvfrac = 0.10)
     Dataset(fname_cv,"a") do ds
         data = ds[varname][:,:,:];
         time = ds["time"][:];
-        mask = ds["mask"][:,:][:,:,1:1] .== 1
+
+        if !haskey(ds,"mask")
+            @info "no mask in $fname"
+            mask = trues(size(data)[1:2]...,1)
+        else
+            mask = ds["mask"][:,:][:,:,1:1] .== 1
+        end
 
         data[.!ismissing.(data) .& .!mask] .= missing
 
         nvalid = sum(.!ismissing.(data))
 
         ncv = 0
-
+        dest_count = 0
         tmp = data[:,:,1]
         nmissing = sum(ismissing,data,dims=[1,2])[1,1,:]
+        frac_missing = (nmissing .- sum(.!mask)) / (size(data,1)*size(data,2) - sum(.!mask))
+
+        @show extrema(frac_missing)
+        @show frac_missing[1:10]
+
+        candiate_mask_index = findall(min_frac_missing .<= frac_missing .<= max_frac_missing)
+        @show length(candiate_mask_index)
 
         for n_dest in sortperm(nmissing)
-            n_source = rand(1:size(data,3))
+            n_source = rand(candiate_mask_index)
 
             tmp = data[:,:,n_dest]
             nmissing_before = sum(ismissing,tmp)
@@ -121,14 +148,16 @@ function addcvpoint(fname,varname; mincvfrac = 0.10)
 
             ncv += nmissing_after - nmissing_before
 
+            dest_count += 1
             if ncv >= mincvfrac * nvalid
                 break
             end
-            @show n_dest,time[n_dest],nmissing_after - nmissing_before,ncv,mincvfrac * nvalid
+            #@show n_dest,time[n_dest],nmissing_after - nmissing_before,ncv,mincvfrac * nvalid
         end
 
         @info("number cross-validation points ",ncv)
         @info("percentage of cross-validation points ",100*ncv/nvalid)
+        @info("number corrupted images ",dest_count)
 
         ds[varname][:] = data
     end
@@ -141,7 +170,7 @@ function listcvimages(case)
     mask = ds_cv["mask"][:,:] .== 1
 
     image_index = Int[]
-    for n = 1:ds_cv.dim["time"]
+    for n = 1:length(ds_cv["time"])
         data_cv = ds_cv[case.varname][:,:,n]
         data_orig = ds_orig[case.varname][:,:,n]
         data_orig[.!mask] .= missing
@@ -156,3 +185,75 @@ function listcvimages(case)
     close(ds_orig)
     return image_index
 end
+
+
+function seasonalaverage(SST,time; DT = 30, cycle_len = 365)
+    half_DT = DT/2
+    half_cycle_len = cycle_len/2
+    doy = Dates.dayofyear.(time);
+    mSST = zeros(eltype(SST),size(SST,1),size(SST,2),maximum(doy))
+
+    Threads.@threads for j = 1:size(SST,2)
+        for i = 1:size(SST,1)
+            for nn = 1:size(mSST,3)
+            #for nn = 1:10
+                count = 0
+
+                for n = 1:length(time)
+                    #if isfinite(SST[i,j,n])
+                    if !ismissing(SST[i,j,n])
+                        if abs( mod( doy[n] - nn + half_cycle_len, cycle_len) - half_cycle_len) <= half_DT
+                            mSST[i,j,nn] += SST[i,j,n]
+                            count += 1
+                        end
+                    end
+                end
+
+                if count > 0
+                    mSST[i,j,nn] /= count
+                else
+                    mSST[i,j,nn] = missing
+                end
+
+#                #for i = 1:2
+#                sel .= abs.(  mod.( doy  .- doy[nn] .+ 365/2, 365) .- 365/2) .<= DT÷2;
+#                mSST[i,j,nn] = mean(@view SST[i,j,sel])
+            end
+        end
+    end
+    return mSST
+
+end
+
+
+function remove_seasonal_cycle(SST,SSTtime; DT = 30, cycle_len = 365)
+    doy = Dates.dayofyear.(SSTtime);
+    mSST2 = seasonalaverage(
+        SST,SSTtime;
+        DT = DT, cycle_len = cycle_len);
+
+    SSTa = similar(SST);
+    for n = 1:size(SST,3)
+        SSTa[:,:,n] = SST[:,:,n] - mSST2[:,:,doy[n]]
+    end
+    return SSTa,mSST2
+end
+
+function std_around_seasonalaverage(SST,SSTtime; DT = 30, cycle_len = 365)
+    doy = Dates.dayofyear.(SSTtime);
+    mSST2 = seasonalaverage(
+        SST,SSTtime;
+        DT = DT, cycle_len = cycle_len);
+
+    SSTa = similar(SST);
+    for n = 1:size(SST,3)
+        SSTa[:,:,n] = SST[:,:,n] - mSST2[:,:,doy[n]]
+    end
+
+    count = sum(.!ismissing.(SSTa), dims = 3)
+    SSTa[ismissing.(SST)] .= 0
+
+    SST_std = sqrt.(sum(SSTa.^2,dims = 3) ./ count)[:,:,1];
+    return SST_std
+end
+

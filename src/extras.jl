@@ -1,9 +1,12 @@
+using PyPlot
 using DIVAnd
 using FileWatching
 using ForecastVerification
 using JLD2
 using LaTeXTabulars
 using OceanPlot
+using Printf
+using NCDatasets
 
 include("linreg.jl")
 
@@ -500,67 +503,6 @@ function plotregion()
     savefig("plotregion.png",dpi=300);
 end
 
-function seasonalaverage(SST,time; DT = 30)
-    cycle_len = 365
-    half_DT = DT/2
-    half_cycle_len = cycle_len/2
-    doy = Dates.dayofyear.(time);
-    mSST = zeros(eltype(SST),size(SST,1),size(SST,2),maximum(doy))
-
-    Threads.@threads for j = 1:size(SST,2)
-        for i = 1:size(SST,1)
-            for nn = 1:size(mSST,3)
-            #for nn = 1:10
-                count = 0
-
-                for n = 1:length(time)
-                    #if isfinite(SST[i,j,n])
-                    if !ismissing(SST[i,j,n])
-                        if abs( mod( doy[n] - nn + half_cycle_len, cycle_len) - half_cycle_len) <= half_DT
-                            mSST[i,j,nn] += SST[i,j,n]
-                            count += 1
-                        end
-                    end
-                end
-                mSST[i,j,nn] /= count
-
-#                #for i = 1:2
-#                sel .= abs.(  mod.( doy  .- doy[nn] .+ 365/2, 365) .- 365/2) .<= DT÷2;
-#                mSST[i,j,nn] = mean(@view SST[i,j,sel])
-            end
-        end
-    end
-    return mSST
-
-end
-
-
-function remove_seasonal_cycle(SST,SSTtime; DT = 30)
-    doy = Dates.dayofyear.(SSTtime);
-    mSST2 = DINCAE_utils.seasonalaverage(SST,SSTtime; DT = DT);
-
-    SSTa = similar(SST);
-    for n = 1:size(SST,3)
-        SSTa[:,:,n] = SST[:,:,n] - mSST2[:,:,doy[n]]
-    end
-    return SSTa
-end
-
-function std_around_seasonalaverage(SST,SSTtime)
-    doy = Dates.dayofyear.(SSTtime);
-    mSST2 = DINCAE_utils.seasonalaverage(SST,SSTtime);
-
-    SSTa = similar(SST);
-    for n = 1:size(SST,3)
-        SSTa[:,:,n] = SST[:,:,n] - mSST2[:,:,doy[n]]
-    end
-
-    count = sum(.!ismissing.(SSTa), dims = 3)
-    SSTa[ismissing.(SST)] .= 0
-
-    SST_std = sqrt.(sum(SSTa.^2,dims = 3) ./ count)[:,:,1];
-    return SST_std
-end
 
 
 function plot_std_around_seasonalaverage(lon,lat,SST_std; vmin = 0.7, vmax = 1.4)
