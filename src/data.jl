@@ -51,7 +51,12 @@ end
     DINCAE_utils.add_mask(fname,varname; minseafrac = 0.05)
 
 Adds a mask based on minimum fraction of sea data in the NetCDF variable
-`varname`.
+`varname` from the NetCDF file `fname`. In the mask, sea=1, land=0.
+The function also create the a NetCDF variable with the
+number of present data point ('count_nomissing`) counted over the time
+dimension.
+For every pixel where the fraction of valid data is less than
+`minseafrac`(0.05 or 5%), it will be considered as land point.
 """
 function add_mask(fname,varname; minseafrac = 0.05)
     Dataset(fname,"a") do ds
@@ -76,10 +81,10 @@ end
     DINCAE_utils.addcvpoint(fname,varname; mincvfrac = 0.10)
 
 Add cross-validation points to a dataset. This functions will withheld data in
-the time instance with the highest data coverage (i.e. the cleanest image) 
-using the cloud mask from another time instance (choosen at random). Then 
+the time instance with the highest data coverage (i.e. the cleanest image)
+using the cloud mask from another time instance (choosen at random). Then
 the algorithm will proceed the next image with the second highest coverage and so on.
-The algorithm stops when the fraction of cross-validation data point is at minimum 
+The algorithm stops when the fraction of cross-validation data point is at minimum
 `mincvfrac` (per default 0.1 or 10%).
 """
 function addcvpoint(fname,varname; mincvfrac = 0.10)
@@ -151,4 +156,3 @@ function listcvimages(case)
     close(ds_orig)
     return image_index
 end
-
