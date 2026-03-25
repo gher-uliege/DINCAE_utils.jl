@@ -11,7 +11,7 @@ using NCDatasets
 using Printf
 using PyPlot
 using PyCall
-using PyCall: PyObject
+import PyCall: PyObject
 using Random
 using Statistics
 using Interpolations

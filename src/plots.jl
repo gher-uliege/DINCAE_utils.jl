@@ -1,6 +1,6 @@
 
 
-function PyObject(a::Array{Union{Missing},N}) where {N}
+function PyCall.PyObject(a::Array{Union{Missing},N}) where {N}
   numpy_ma = pyimport("numpy").ma
   pycall(numpy_ma.array, Any, coalesce.(a,1.), mask=ismissing.(a))
 end
